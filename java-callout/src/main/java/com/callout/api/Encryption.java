@@ -1,25 +1,26 @@
 package com.callout.api;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
-
-import javax.crypto.Cipher;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import com.apigee.flow.execution.ExecutionContext;
 import com.apigee.flow.execution.ExecutionResult;
 import com.apigee.flow.execution.spi.Execution;
 import com.apigee.flow.message.MessageContext;
+import com.callout.api.security.PayloadEncryptorDecryptor;
+import com.callout.api.security.exception.EncryptionDecryptionException;
+import com.callout.api.security.impl.DefaultPayloadEncryptorDecryptor;
 
 public class Encryption implements Execution {
+
+    PayloadEncryptorDecryptor payloadEncryptorDecryptor = new DefaultPayloadEncryptorDecryptor();
     private Map<String, String> properties; // read-only
 
     public Encryption(Map<String, String> properties) {
         this.properties = properties;
     }
-    
+
+    @Override
     public ExecutionResult execute(MessageContext messageContext, ExecutionContext executionContext) {
         try {
             // Retrieve and validate input message
@@ -55,12 +56,8 @@ public class Encryption implements Execution {
                 }
             }
 
-
-
-
             byte[] keyByte = Base64.getDecoder().decode(key);
             byte[] ivByte = Base64.getDecoder().decode(iv);
-
 
             // Validate key and IV sizes
             if (keyByte.length != 16 && keyByte.length != 32) {
@@ -72,28 +69,15 @@ public class Encryption implements Execution {
                 return ExecutionResult.ABORT;
             }
 
-            String encryptedString;
-            byte[] plainBytes = msg.getBytes(StandardCharsets.UTF_8);
-
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            SecretKeySpec keySpec = new SecretKeySpec(keyByte, "AES");
-            GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, ivByte);
-            cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmParameterSpec);
-            byte[] encryptedBytes = cipher.doFinal(plainBytes);
-            encryptedString = Base64.getEncoder().encodeToString(encryptedBytes);
-            messageContext.setVariable("enc_payload", encryptedString);
+            String encryptedBytes = payloadEncryptorDecryptor.encrypt(key, iv, msg);
+            messageContext.setVariable("enc_payload", encryptedBytes);
             return ExecutionResult.SUCCESS;
+
         } catch (IllegalArgumentException e) {
             messageContext.setVariable("error", "IllegalArgumentException: " + e.getMessage());
             return ExecutionResult.ABORT;
-        } catch (java.security.InvalidKeyException e) {
-            messageContext.setVariable("error", "InvalidKeyException: " + e.getMessage());
-            return ExecutionResult.ABORT;
-        } catch (javax.crypto.BadPaddingException e) {
-            messageContext.setVariable("error", "BadPaddingException: " + e.getMessage());
-            return ExecutionResult.ABORT;
-        } catch (javax.crypto.IllegalBlockSizeException e) {
-            messageContext.setVariable("error", "IllegalBlockSizeException: " + e.getMessage());
+        } catch (EncryptionDecryptionException e) {
+            messageContext.setVariable("error", "EncryptionDecryptionException: " + e.getMessage());
             return ExecutionResult.ABORT;
         } catch (Exception e) {
             messageContext.setVariable("error", "Encryption failed: " + e.getMessage());

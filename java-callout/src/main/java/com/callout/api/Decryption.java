@@ -1,21 +1,18 @@
 package com.callout.api;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
-
-import javax.crypto.Cipher;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import com.apigee.flow.execution.ExecutionContext;
 import com.apigee.flow.execution.ExecutionResult;
 import com.apigee.flow.execution.spi.Execution;
 import com.apigee.flow.message.MessageContext;
+import com.callout.api.security.PayloadEncryptorDecryptor;
+import com.callout.api.security.impl.DefaultPayloadEncryptorDecryptor;
 
 public class Decryption implements Execution {
 
-    private static final int GCM_TAG_LENGTH = 16; // Tag length in bytes
+    PayloadEncryptorDecryptor payloadEncryptorDecryptor = new DefaultPayloadEncryptorDecryptor();
 
     private Map<String, String> properties; // read-only
 
@@ -71,20 +68,12 @@ public class Decryption implements Execution {
                 return ExecutionResult.ABORT;
             }
 
-            // Proceed with decryption
-            Cipher cipherD = Cipher.getInstance("AES/GCM/NoPadding");
-            SecretKeySpec keySpecD = new SecretKeySpec(keyBytes, "AES");
-            GCMParameterSpec gcmParameterSpecD = new GCMParameterSpec(GCM_TAG_LENGTH * 8, ivBytes);
-            cipherD.init(Cipher.DECRYPT_MODE, keySpecD, gcmParameterSpecD);
-            byte[] plainBytesD = cipherD.doFinal(encryptedBytesForDecryption);
-            String originalText = new String(plainBytesD, StandardCharsets.UTF_8);
-            messageContext.setVariable("decrypted_payload", originalText);
+            // Call the decrypt method
+            String decryptedBytes = payloadEncryptorDecryptor.decrypt(Base64.getEncoder().encodeToString(keyBytes), Base64.getEncoder().encodeToString(ivBytes), Base64.getEncoder().encodeToString(encryptedBytesForDecryption));
+            messageContext.setVariable("decrypted_payload", decryptedBytes);
             return ExecutionResult.SUCCESS;
         } catch (IllegalArgumentException e) {
             messageContext.setVariable("error", "Invalid input: " + e.getMessage());
-            return ExecutionResult.ABORT;
-        } catch (javax.crypto.BadPaddingException | javax.crypto.IllegalBlockSizeException e) {
-            messageContext.setVariable("error", "Decryption error: " + e.getMessage());
             return ExecutionResult.ABORT;
         } catch (Exception e) {
             messageContext.setVariable("error", "Decryption failed: " + e.getMessage());
