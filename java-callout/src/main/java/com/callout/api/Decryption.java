@@ -1,6 +1,5 @@
 package com.callout.api;
 
-import java.util.Base64;
 import java.util.Map;
 
 import com.apigee.flow.execution.ExecutionContext;
@@ -8,6 +7,7 @@ import com.apigee.flow.execution.ExecutionResult;
 import com.apigee.flow.execution.spi.Execution;
 import com.apigee.flow.message.MessageContext;
 import com.callout.api.security.PayloadEncryptorDecryptor;
+import com.callout.api.security.exception.EncryptionDecryptionException;
 import com.callout.api.security.impl.DefaultPayloadEncryptorDecryptor;
 
 public class Decryption implements Execution {
@@ -53,23 +53,18 @@ public class Decryption implements Execution {
                 }
             }
 
-            // Decode Base64 encoded strings
-            byte[] keyBytes = Base64.getDecoder().decode(key);
-            byte[] ivBytes = Base64.getDecoder().decode(iv);
-            byte[] encryptedBytesForDecryption = Base64.getDecoder().decode(encryptedMessage);
 
-            // Validate key and IV sizes
-            if (keyBytes.length != 16 && keyBytes.length != 32) {
-                messageContext.setVariable("error", "Invalid key size: " + keyBytes.length + " bytes. Expected 16 or 32 bytes.");
-                return ExecutionResult.ABORT;
-            }
-            if (ivBytes.length != 12) {
-                messageContext.setVariable("error", "Invalid IV size: " + ivBytes.length + " bytes. Expected 12 bytes.");
+
+            // Use DefaultPayloadEncryptorDecryptor to set key and IV
+            try {
+                ((DefaultPayloadEncryptorDecryptor) payloadEncryptorDecryptor).setKeyAndIvInBytes(key, iv);
+            } catch (EncryptionDecryptionException e) {
+                messageContext.setVariable("error", e.getMessage());
                 return ExecutionResult.ABORT;
             }
 
             // Call the decrypt method
-            String decryptedBytes = payloadEncryptorDecryptor.decrypt(Base64.getEncoder().encodeToString(keyBytes), Base64.getEncoder().encodeToString(ivBytes), Base64.getEncoder().encodeToString(encryptedBytesForDecryption));
+            String decryptedBytes = payloadEncryptorDecryptor.decrypt(key, iv, encryptedMessage);
             messageContext.setVariable("decrypted_payload", decryptedBytes);
             return ExecutionResult.SUCCESS;
         } catch (IllegalArgumentException e) {

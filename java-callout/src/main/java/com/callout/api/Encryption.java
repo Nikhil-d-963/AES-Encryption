@@ -1,6 +1,5 @@
 package com.callout.api;
 
-import java.util.Base64;
 import java.util.Map;
 
 import com.apigee.flow.execution.ExecutionContext;
@@ -55,19 +54,13 @@ public class Encryption implements Execution {
                     return ExecutionResult.ABORT;
                 }
             }
-
-            byte[] keyByte = Base64.getDecoder().decode(key);
-            byte[] ivByte = Base64.getDecoder().decode(iv);
-
-            // Validate key and IV sizes
-            if (keyByte.length != 16 && keyByte.length != 32) {
-                messageContext.setVariable("error", "Invalid key size: " + keyByte.length + " bytes. Expected 16 or 32 bytes.");
-                return ExecutionResult.ABORT;
-            }
-            if (ivByte.length != 12) {
-                messageContext.setVariable("error", "Invalid IV size: " + ivByte.length + " bytes. Expected 12 bytes.");
-                return ExecutionResult.ABORT;
-            }
+        // Use DefaultPayloadEncryptorDecryptor to set key and IV
+        try {
+            ((DefaultPayloadEncryptorDecryptor) payloadEncryptorDecryptor).setKeyAndIvInBytes(key, iv);
+        } catch (EncryptionDecryptionException e) {
+            messageContext.setVariable("error", e.getMessage());
+            return ExecutionResult.ABORT;
+        }
 
             String encryptedBytes = payloadEncryptorDecryptor.encrypt(key, iv, msg);
             messageContext.setVariable("enc_payload", encryptedBytes);

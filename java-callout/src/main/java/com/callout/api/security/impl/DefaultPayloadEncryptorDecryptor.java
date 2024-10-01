@@ -34,7 +34,7 @@ public class DefaultPayloadEncryptorDecryptor implements PayloadEncryptorDecrypt
         }
     }
 
-    private void setKeyAndIvInBytes(String encKey, String initVector) throws EncryptionDecryptionException {
+    public void setKeyAndIvInBytes(String encKey, String initVector) throws EncryptionDecryptionException {
         this.keyBytes = Base64.getDecoder().decode(encKey);
         this.ivBytes = Base64.getDecoder().decode(initVector);
 
