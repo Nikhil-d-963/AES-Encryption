@@ -1,4 +1,4 @@
-# Sample Java Callout Project
+# Java Callout Project With Junit test cases
 
 This reference project provides a simple example of an API Proxy using a
 Custom Java Callout.
